@@ -69,6 +69,13 @@ stdenv.mkDerivation (finalAttrs: {
 
   dontBuild = true;
 
+  # Keep relocated writable ELF headers separate from read-only LOAD segments.
+  # Otherwise the dynamic loader can segfault while updating DT_DEBUG.
+  patchelfFlags = [
+    "--page-size"
+    "65536"
+  ];
+
   installPhase = ''
     runHook preInstall
 
@@ -95,6 +102,17 @@ stdenv.mkDerivation (finalAttrs: {
       }"
 
     runHook postInstall
+  '';
+
+  doInstallCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+  installCheckPhase = ''
+    runHook preInstallCheck
+
+    # Exercise the loader without opening a display or reading user settings.
+    binary="$out/bin/.Vital-wrapped"
+    "$(patchelf --print-interpreter "$binary")" --list "$binary" > /dev/null
+
+    runHook postInstallCheck
   '';
 
   meta = {
